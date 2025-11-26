@@ -60,6 +60,10 @@ M = sparse([ ...
     M81 M81 M81 M81 M85 M86 M87 M88; ... % pH equation
     ]);
 
+% Add extra row and column for tandem cell algebraic constraint
+M(:,end+1) = 0;
+M(end+1,:) = 0;
+
 % Perform any additional step requested by the optional input argument flag
 if nargin>2
     if strcmp(flag,'none')

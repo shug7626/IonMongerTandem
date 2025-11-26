@@ -16,7 +16,7 @@ warnon = warning('error','MATLAB:ode15s:IntegrationTolNotMet');
 % Note that the mass matrix is adjusted so ions are as mobile as electrons
 if exist('AnJac','file')
     options.Jacobian = @(t,u) AnJac(t,u,params,vectors,matrices);
-else
+elseif exist('Jac','file')
     options.JPattern = Jac(params);
 end
 options.Mass = mass_matrix(params,vectors,'precondition');
@@ -45,7 +45,9 @@ if exist('AnJac.m','file')
     [sol_init,~,exitflag,~] = fsolve(@(u) RHS_AnJac(u,psi, ...
         params,vectors,matrices,'init'),sol_init,fsoptions);
 else
-    fsoptions.JacobPattern = Jac(params,'init');
+    if exist('Jac.m','file')
+        fsoptions.JacobPattern = Jac(params,'init');
+    end
     [sol_init,~,exitflag,~] = fsolve(@(u) RHS(0,u,psi, ...
         params,vectors,matrices,'init'),sol_init,fsoptions);
 end

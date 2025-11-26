@@ -113,9 +113,15 @@ vnH   = 0.1;     % electron recombination velocity for SRH (ms-1)
 vpH   = 1e5;     % effective hole recombination velocity for SRH (ms-1)
 
 % Parasitic resistances (optional)
-% Rs    = 0;       % external series resistance (Ohm)
-% Rp    = Inf;     % parallel or shunt resistance (Ohm) (can choose Inf)
-% Acell = 1;       % cell area (cm2) (only used to scale the series resistance)
+Rs    = 0;       % external series resistance (Ohm)
+Rp    = Inf;     % parallel or shunt resistance (Ohm) (can choose Inf)
+Acell = 1;       % cell area (cm2) (only used to scale the series resistance)
+
+% Extra parameters for tandem cell
+jsc   = 22;      % short-circuit current density (mA/cm2)
+j0    = 1e-10;   % dark current densiy (mA/cm2)
+nid   = 1;       % ideality factor
+Rp2   = Inf;     % parallel or shunt resistance (Ohm)
 
 %% Option to set initial distributions from a saved solution
 
