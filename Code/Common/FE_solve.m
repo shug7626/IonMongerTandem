@@ -61,12 +61,13 @@ if isfield(params,'input_filename')
     nE   = interp1(sol.vectors.xE,nE,  vectors.xE*b*1e9)/dE;
     phiH = interp1(sol.vectors.xH,phiH,vectors.xH*b*1e9)/VT;
     pH   = interp1(sol.vectors.xH,pH,  vectors.xH*b*1e9)/dH;
+    phiSi = sol.dstrbns.phiSi(end,:)/VT;
     
     % eliminate superfluous phi points
     phiE = phiE(1:end-1);
     phiH = phiH(2:end);
     
-    sol_start = [P; phi; n; p; phiE; nE; phiH; pH];
+    sol_start = [P; phi; n; p; phiE; nE; phiH; pH; phiSi];
     
     if any(isnan(sol_start))
         error(['There was an error in interpolating the saved ' ... 
@@ -90,7 +91,7 @@ while count == err_count
         elseif findVoc
             % Precondition the cell at open-circuit
             [psi, sol_init] = find_Voc(sol_init,psi,params,vectors,matrices,options);
-        elseif abs(psi(0))>atol
+        elseif abs(sol_init(4*params.N+5)-psi(0)-params.phidisp)>atol
             % Precondition at an applied voltage other than Vbi
             sol_init = precondition(sol_init,params,vectors,matrices,options);
         end

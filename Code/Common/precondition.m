@@ -20,7 +20,8 @@ elseif exist('Jac','file')
     options.JPattern = Jac(params);
 end
 options.Mass = mass_matrix(params,vectors,'precondition');
-options.InitialSlope = RHS(0,sol_init,@(t) 0,params,vectors,matrices) ...
+psi0 = -sol_init(end)/2;
+options.InitialSlope = RHS(0,sol_init,@(t) psi0,params,vectors,matrices) ...
     \options.Mass;
 options.OutputFcn = []; % Surpress output during preconditioning
 
@@ -28,7 +29,8 @@ options.OutputFcn = []; % Surpress output during preconditioning
 params.G = @(x,t) G(x,0);
 
 % Evolve the solution from Vbi to the preconditioning voltage
-[~,numsol] = ode15s(@(t,u) RHS(t,u,@(t) psi(0)*t/10,params,vectors,matrices), ...
+[~,numsol] = ode15s(@(t,u) RHS(t,u, ...
+    @(t) psi0+(psi(0)-psi0)*t/10,params,vectors,matrices), ...
     [0 10],sol_init,options);
 sol_init = numsol(end,:)';
 

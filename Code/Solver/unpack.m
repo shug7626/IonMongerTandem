@@ -15,5 +15,6 @@ dstrbns.phiE = [numsol(:,4*N+5:4*N+NE+4), numsol(:,N+2)];
 dstrbns.nE   = numsol(:,4*N+NE+5:4*N+2*NE+5);
 dstrbns.phiH = [numsol(:,2*N+2), numsol(:,4*N+2*NE+6:4*N+2*NE+NH+5)];
 dstrbns.pH   = numsol(:,4*N+2*NE+NH+6:4*N+2*NE+2*NH+6);
+dstrbns.phiSi = numsol(:,4*N+2*NE+2*NH+7);
 
 end

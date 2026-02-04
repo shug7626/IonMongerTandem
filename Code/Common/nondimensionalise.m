@@ -214,7 +214,8 @@ end
 if ~any(Acell), Acell = 1; end % default is cell area of 1 cm2
 ARs = Rs*Acell/1e4*q*G0*b/VT; % non-dim. external series resistance x cell area
 ARp = Rp*Acell/1e4*q*G0*b/VT; % non-dim. parallel/shunt resistance x cell area
-ARp2 = Rp2*Acell/1e4*q*G0*b/VT; % non-dim. parallel/shunt resistance x cell area
+Rsp = Rs/Rp; % ratio between series and top-cell parallel/shunt resistance
+Rsp2 = Rs/Rp2; % ratio between series and bottom-cell parallel/shunt resistance
 Jsc  = jsc/jay; % non-dim. short-circuit current density
 J0   = j0/jay;  % non-dim. dark current density
 

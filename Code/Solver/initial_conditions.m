@@ -4,10 +4,11 @@ function sol_init = initial_conditions(psi0,params,vectors,matrices)
 % vectors and matrices needed by the solver.
 
 % Parameter input
-[chi, nc, pc, Verbose, NE, NH, phidisp] = ...
-    struct2array(params, {'chi','nc','pc','Verbose','NE','NH','phidisp'});
+[chi, nc, pc, Verbose, N, NE, NH, phidisp] = ...
+    struct2array(params, {'chi','nc','pc','Verbose','N','NE','NH','phidisp'});
 [x, xE, xH] = struct2array(vectors, {'x','xE','xH'});
 
+%% First find initial conditions for the perovskite top-cell at its Vbi
 % Define uniform profiles for the ion vacancy density and electric potential
 P_init    = ones(size(x));
 phi_init  = zeros(size(x))+phidisp;
@@ -25,16 +26,10 @@ nE_init = nc+(1-nc)*tanh(stE*(xE(1)-xE))/tanh(stE*(xE(1)-xE(end)));
 stH = 3/(xH(end)-1);
 pH_init = pc+(1-pc)*tanh(stH*(xH(end)-xH))/tanh(stH*(xH(end)-xH(1)));
 
-%%%%%
-% Need some way to estimate the dimensionless potential across second cell
-phi_silicon = 0/params.VT;
-%%%%%
-
 % Combine the initial conditions into one vector to pass to fsolve
 sol_init  = [P_init; phi_init; n_init; p_init; ... % perovskite
              phiE_init; nE_init; ... % electron transport layer
-             phiH_init; pH_init; ... % hole transport layer
-             phi_silicon]; % second cell in tandem device
+             phiH_init; pH_init]; % hole transport layer
 
 % Define the settings for the call to fsolve
 fsoptions = optimoptions('fsolve','MaxIterations',40);
@@ -43,10 +38,41 @@ if Verbose, fsoptions.Display = 'iter'; else, fsoptions.Display = 'off'; end
 % Use the initial guess to obtain an approximate steady-state solution
 if exist('AnJac','file')
     fsoptions.SpecifyObjectiveGradient = true;
+    [sol_init,~,exitflag,~] = fsolve(@(u) RHS_AnJac_top(u,psi0, ...
+        params,vectors,matrices,'init'),sol_init,fsoptions);
+else
+    if exist('Jac','file')
+        fsoptions.JacobPattern = Jac_top(params,'init');
+    end
+    [sol_init,~,exitflag,~] = fsolve(@(u) RHS_top(0,u,psi0, ...
+        params,vectors,matrices,'init'),sol_init,fsoptions);
+end
+if exitflag<1
+    warning(['Steady-state initial conditions could not be found to ' ...
+        'a high degree of accuracy and may be unphysical.']);
+end
+
+% Ensure all the algebraic equations are satisfied as exactly as possible
+sol_init = apply_Poisson(sol_init,params,vectors,matrices);
+
+
+%% Append a state for the bottom-cell potential at corresponding current
+% Compute and append the potential across the bottom-cell
+pbiSi = bottom_cell_potential(sol_init,params,vectors);
+sol_init(end+1) = pbiSi;
+
+% Shift the top-cell potential distribution to satisfy the BCs
+sol_init([N+2:2*N+2,4*N+5:4*N+NE+4,4*N+2*NE+6:4*N+2*NE+NH+5]) = ...
+    sol_init([N+2:2*N+2,4*N+5:4*N+NE+4,4*N+2*NE+6:4*N+2*NE+NH+5])-pbiSi/2;
+
+% Use the initial guess to obtain an approximate steady-state solution
+psi0 = @(t) -pbiSi/2;
+if exist('AnJac','file')
+    fsoptions.SpecifyObjectiveGradient = true;
     [sol_init,~,exitflag,~] = fsolve(@(u) RHS_AnJac(u,psi0, ...
         params,vectors,matrices,'init'),sol_init,fsoptions);
 else
-    if exist('AnJac','file')
+    if exist('Jac','file')
         fsoptions.JacobPattern = Jac(params,'init');
     end
     [sol_init,~,exitflag,~] = fsolve(@(u) RHS(0,u,psi0, ...
@@ -59,51 +85,6 @@ end
 
 % Ensure all the algebraic equations are satisfied as exactly as possible
 sol_init = apply_Poisson(sol_init,params,vectors,matrices);
-
-%%%%% Testing
-i = 0;
-while exitflag<1 && i<3
-    i = i+1;
-    % Concentrations should be real and positive... enforce for now
-    sol_init(1:end-1) = max(0, real(sol_init(1:end-1)));
-    % Repeat with new initial guess
-    [sol_init,~,exitflag,~] = fsolve(@(u) RHS(0,u,psi0, ...
-        params,vectors,matrices,'init'),sol_init,fsoptions);
-    sol_init = apply_Poisson(sol_init,params,vectors,matrices);
-end
-sol_init(1:end-1) = max(0, real(sol_init(1:end-1)));
-
-disp("Initial potential across the second cell:")
-disp(params.VT*sol_init(end));
-disp("Initial current density;")
-disp(params.jay*(params.Jsc-params.J0*(exp(sol_init(end)/params.nid)-1)-sol_init(end)/params.ARp2))
-
-% Assign variable names
-N = params.N;
-P   = sol_init(1:N+1);
-phi = sol_init(N+2:2*N+2);
-n   = sol_init(2*N+3:3*N+3);
-p   = sol_init(3*N+4:4*N+4);
-phiE = [sol_init(4*N+5:4*N+NE+4); phi(1)];
-nE   = sol_init(4*N+NE+5:4*N+2*NE+5);
-phiH = [phi(end); sol_init(4*N+2*NE+6:4*N+2*NE+NH+5)];
-pH   = sol_init(4*N+2*NE+NH+6:4*N+2*NE+2*NH+6);
-
-figure;
-plot(1:length(sol_init), RHS(0,sol_init,psi0,params,vectors,matrices,'init'));
-xlabel("Position");
-ylabel("Residual");
-
-figure; hold on;
-plot(x,P, x,phi, x,n, x,p); % perovkite layer variables
-plot(xE,phiE, xE,nE); % ETL variables
-plot(xH,phiH, xH, pH); % HTL variables
-plot(2,sol_init(end),'x'); % the extra tandem cell variable
-legend(["P", "phi", "p", "n", "phiE", "nE", "phiH", "pH", "phi_{silicon}"]);
-xlabel("Distance, x");
-ylabel("Initial dimensionless value");
-drawnow;
-%%%%%
 
 end
 
@@ -123,4 +104,39 @@ res = [yb(1)-1; ...
        ya(2)+Rl(1,ya(1)); ...
        ya(3)-1; ...
        yb(4)+Rr(yb(3),1)];
+end
+
+%% The RHS and the Jacobian for the perovskite top-cell only
+function [F, J] = RHS_AnJac_top(u,psi,params,vectors,matrices,flag)
+[F, J] = RHS_AnJac([u;0],psi,params,vectors,matrices,flag);
+F = F(1:end-1,:);
+J = J(1:end-1,1:end-1);
+end
+function JJJ = Jac_top(params,flag)
+JJJ = Jac(params,flag);
+JJJ = JJJ(1:end-1,1:end-1);
+end
+function dudt = RHS_top(t,u,psi,params,vectors,matrices,flag)
+dudt = RHS(t,[u;0],psi,params,vectors,matrices,flag);
+dudt = dudt(1:end-1,:);
+end
+
+%% The potential across the bottom-cell
+function pbiSi = bottom_cell_potential(sol_init,params,vectors)
+[jay, jsc, j0, nid, VT, Acell, Rp, Rp2, Vbi] = ...
+    struct2array(params, {'jay','jsc','j0','nid','VT','Acell','Rp', ...
+                          'Rp2','Vbi'});
+
+% Compute the current density through the top-cell and series resistor
+dstrbns = unpack(repmat([sol_init;0]',2),params);
+params.time = [0,1]; % current is calculated from two time points
+[J_top, ~, ~, ~] = calculate_currents(params,vectors,dstrbns);
+J_top = J_top(end)*jay; % mA/cm2
+J_res = -Vbi/(Acell/1e4*Rp)/10;
+
+% Compute the corresponding potential across the bottom-cell
+potential_eqn = @(V) jsc-j0*(exp(V/(nid*VT))-1)-V/(Acell/1e4*Rp2)/10 ...
+                     -J_top-J_res;
+VSi = fsolve(potential_eqn, Vbi);
+pbiSi = VSi/VT;
 end

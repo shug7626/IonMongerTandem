@@ -118,10 +118,11 @@ Rp    = Inf;     % parallel or shunt resistance (Ohm) (can choose Inf)
 Acell = 1;       % cell area (cm2) (only used to scale the series resistance)
 
 % Extra parameters for tandem cell
-jsc   = 22;      % short-circuit current density (mA/cm2)
-j0    = 1e-10;   % dark current densiy (mA/cm2)
+jsc   = 22.4;    % short-circuit current density (mA/cm2)
+j0    = 1e-10;   % dark current density (mA/cm2)
 nid   = 1;       % ideality factor
 Rp2   = Inf;     % parallel or shunt resistance (Ohm)
+
 
 %% Option to set initial distributions from a saved solution
 
@@ -160,10 +161,10 @@ light_intensity = ...
 % beginning with either 'open-circuit' or an initial value, in Volts). For
 % impedance spectroscopy protocols, see GUIDE.md.
 applied_voltage = ...
-    {Vbi, ... % steady-state initial value
-    'tanh', 5, 1.2, ... % preconditioning
-    'linear', 1.2/0.1, 0, ... % reverse scan
-    'linear', 1.2/0.1, 1.2 ... % reverse scan
+    {Vbi+0.5828, ... % steady-state initial value
+    'tanh', 5, 1.8, ... % preconditioning
+    'linear', 1.8/0.1, 0, ... % reverse scan
+    'linear', 1.8/0.1, 1.8, ... % forward scan
     };
 
 % Impedance protocol template:

@@ -9,14 +9,14 @@ function dudt = RHS(t,u,psi,params,vectors,matrices,flag)
 
 % Input parameters and arrays
 [chi, delta, G, R, lambda, lam2, Rr, Rl, N, Kn, Kp, NE, lamE2, KE, kE, ...
-    rE, NH, lamH2, KH, kH, rH, DI, nc, pc, ARs, ARp, pbi, NonlinearFP, ...
-    Pm, SEinv, omegE, SHinv, omegH, phidisp, dpf, Jsc, J0, nid, ARp2] ...
+    rE, NH, lamH2, KH, kH, rH, DI, nc, pc, ARs, Rsp, pbi, NonlinearFP, ...
+    Pm, SEinv, omegE, SHinv, omegH, phidisp, Jsc, J0, nid, Rsp2] ...
     = struct2array(params,{'chi','delta','G','R','lambda','lam2','Rr', ...
                            'Rl','N','Kn','Kp','NE','lamE2','KE','kE', ...
                            'rE','NH','lamH2','KH','kH','rH','DI','nc', ...
-                           'pc','ARs','ARp','pbi','NonlinearFP','Pm', ...
-                           'SEinv','omegE','SHinv','omegH','phidisp','dpf', ...
-                           'Jsc','J0','nid','ARp2'});
+                           'pc','ARs','Rsp','pbi','NonlinearFP','Pm', ...
+                           'SEinv','omegE','SHinv','omegH','phidisp', ...
+                           'Jsc','J0','nid','Rsp2'});
 [x, dx, dxE, dxH] = struct2array(vectors,{'x','dx','dxE','dxH'});
 [dudt, Av, AvE, AvH, Lo, LoE, LoH, Dx, DxE, DxH, NN, ddE, ddH] ...
     = struct2array(matrices,{'dudt','Av','AvE','AvH','Lo','LoE','LoH', ...
@@ -34,7 +34,7 @@ phiE = [u(4*N+5:4*N+NE+4,:); phi(1,:)];
 nE   = u(4*N+NE+5:4*N+2*NE+5,:);
 phiH = [phi(end,:); u(4*N+2*NE+6:4*N+2*NE+NH+5,:)];
 pH   = u(4*N+2*NE+NH+6:4*N+2*NE+2*NH+6,:);
-phi_silicon = u(4*N+2*NE+2*NH+7,:);
+phiSi = u(4*N+2*NE+2*NH+7,:);
 
 % Compute variables (at the half points)
 mE = Dx*phi; % negative electric field
@@ -95,20 +95,11 @@ dudt(4*N+NE+5,:) = nE(1,:)-nc;
 dudt(4*N+NE+6:4*N+2*NE+4,:) = fnE(2:NE,:)-fnE(1:NE-1,:);
 dudt(4*N+2*NE+5,:) = n(1,:) - exp(SEinv(omegE*nE(end,:))-SEinv(omegE));
 
-% Evaluate the dimensionless current densities at the mid-point of the perovskite
-k = ceil((N+1)/2);
-Jn =  Kn./dx(k).*(n(k+1,:)-n(k,:)-(n(k+1,:)+n(k,:)).*(phi(k+1,:)-phi(k,:))./2);
-Jp = -Kp./dx(k).*(p(k+1)-p(k,:)+(p(k+1,:)+p(k,:)).*(phi(k+1,:)-phi(k,:))./2);
-Jf = -dpf./dx(k).*(P(k+1,:)-P(k,:)+(P(k+1,:)+P(k,:)).*(phi(k+1,:)-phi(k,:))./2);
-Js = (pbi-(phiE(1)-phiH(end)))/ARp; % loss due to shunt resistance
-
-% Calculate the total dimensionless photocurrent density
-J_total = Jn+Jp-Jf-Js;
-
 % phiH equation
 dudt(4*N+2*NE+6:4*N+2*NE+NH+4,:) = mEH(2:NH,:)-mEH(1:NH-1,:)-cdH/lamH2;
-dudt(4*N+2*NE+NH+5,:) = phiH(end,:)+psi(t)-J_total*ARs+phi_silicon-phidisp;
-% Note that the last term in this BC accounts for any parasitic resistance
+dudt(4*N+2*NE+NH+5,:) = phiH(end,:)+psi(t) ...
+                        +(fpH(end,:)/kH*ARs+Rsp*(pbi-2*psi(t))+phiSi)/(1+Rsp)-phidisp;
+% Note that the last terms in this BC accounts for the external circuit
 % (neglecting the displacement current, which should be small at the contacts)
 
 % pH equation
@@ -116,9 +107,9 @@ dudt(4*N+2*NE+NH+6,:) = p(end,:) - exp(SHinv(omegH*pH(1,:))-SHinv(omegH));
 dudt(4*N+2*NE+NH+7:4*N+2*NE+2*NH+5,:) = fpH(2:NH,:)-fpH(1:NH-1,:);
 dudt(4*N+2*NE+2*NH+6,:) = pH(end,:)-pc;
 
-% Algebraic constraint for tandem cell
-dudt(4*N+2*NE+2*NH+7,:) = J_total ...
-    -(Jsc-J0*(exp(phi_silicon/nid)-1)-phi_silicon/ARp2);
+% Algebraic constraint for the bottom-cell potential
+dudt(4*N+2*NE+2*NH+7,:) = phiSi ...
+    -nid*log(abs(1+(Jsc-ARs*(phiH(end,:)+psi(t)+(1+Rsp2)*phiSi-phidisp))/J0));
 
 % Perform any additional step requested by the optional input argument flag
 if nargin>6
